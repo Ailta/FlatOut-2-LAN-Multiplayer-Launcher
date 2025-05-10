@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Linq;
 using System.Net;
 using System.Text;
@@ -55,11 +56,24 @@ namespace FO2_Launcher {
             if (selectedOption == 3) { WriteLine("find flatout2 servers", false, 0, 5, defBackgroundColor, ConsoleColor.DarkGray); } else { WriteLine("find flatout2 servers", false, 0, 5, ConsoleColor.DarkGray); }
         }
 
-        public static void SelectingOptions(int selectedOption, List<Network> networks) {
+        public static void SelectingOptions(int selectedOption, List<Network> networks, List<string>? customPrompts = null) {
+            // If there's a custom prompt, it will offset all the actual networks down by the amount of custom prompts
+            int cursorOffset = 0;
+            if (customPrompts != null) {
+                cursorOffset += customPrompts.Count;
+                // Go through each prompt and write it out, if it is selected, invert colors
+                for (int i = 0; i < customPrompts.Count(); i++) {
+                    string customPrompt = customPrompts[i];
+                    Debug.WriteLine((-(selectedOption)) - 1);
+                    if ((-(selectedOption))-1 == i) { WriteLine(customPrompt, false, 0, i+3, defBackgroundColor, defForegroundColor); } 
+                    else { WriteLine(customPrompt, false, 0, i + 3); }
+                }
+            }
+            // Go through each network and write it out, if it is selected, invert colors
             for (int i = 0; i < networks.Count(); i++) {
                 Network network = networks[i];
-                if (selectedOption == i) { WriteLine($"{network.ip} ({network.name})", false, 0, i+3, defBackgroundColor, defForegroundColor); }
-                else { WriteLine($"{network.ip} ({network.name})", false, 0, i+3); }
+                if (selectedOption == i) { WriteLine($"{network.ip} ({network.name})", false, 0, i + 3 + cursorOffset, defBackgroundColor, defForegroundColor); }
+                else { WriteLine($"{network.ip} ({network.name})", false, 0, i+3+cursorOffset); }
             }        
         }
     }

@@ -3,29 +3,16 @@ using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using static FO2_Launcher.TUI;
+using static FO2_Launcher.NetworkManager;
 
 namespace FO2_Launcher {
-    struct Network {
-        public string ip;
-        public string name;
-
-        public Network(string ip, string name) : this() {
-            this.ip = ip;
-            this.name = name;
-        }
-    }
-
     internal class Program {
         static private List<Network> networks = new List<Network> { };
-        static int consoleLines = 0;
         static string gameName = "flatout2.exe";
-        static string settings;
-
-        static string command;
 
         static void Main(string[] args) {
             // Get all IPs
-            GetIPAddresses();
+            networks = GetIPAddresses();
             InitTUI();
             ClearConsole();
             
@@ -68,19 +55,65 @@ namespace FO2_Launcher {
             File.WriteAllText("settings.txt", gameName);
         }
 
-        static void RunClient() {
+        async static void RunClient() {
             ClearConsole();
-            WriteLine("Enter server IP:", false, 0, 2);
-            string ip = Console.ReadLine();
+            WriteLine($"INFO: Scanning for servers. Please wait. Max wait time: 5 seconds per network.", false, 7, 0, defForegroundColor, ConsoleColor.DarkBlue);
+            // Scan the networks for faltout 2 servers
+            List<(string, string)> searchResults = DiscoverServersAsync(networks).GetAwaiter().GetResult();
+            // Convert the searchresults to network List
+            List<Network> servers = searchResults.Select(t => new Network(t.Item1, t.Item2)).ToList();
 
-            if (ValidateIP(ip)) {
+            // Clear console and writeout info that scan was sucessful
+            ClearConsole();
+            WriteLine($"INFO: Scan successful. Found {servers.Count} servers.", false, 7, 0, defForegroundColor, ConsoleColor.DarkBlue);
+
+            // Writeout all the server and an option for custom ip
+            int selectedOption = -1;
+            SelectingOptions(selectedOption, servers, new List<string> { "Custom IP" });
+            ConsoleKeyInfo input;
+            do {
+                input = Console.ReadKey();
+
+                if (input.Key == ConsoleKey.Escape || input.Key == ConsoleKey.Backspace) { ClearConsole(); return; }
+                if (input.Key == ConsoleKey.DownArrow) { selectedOption++; }
+                if (input.Key == ConsoleKey.UpArrow) { selectedOption--; }
+                if (selectedOption < -1) { selectedOption = servers.Count - 1; }
+                if (selectedOption > servers.Count - 1) { selectedOption = -1; }
+
+                SelectingOptions(selectedOption, servers, new List<string> { "Custom IP" });
+            } while (input.Key != ConsoleKey.Enter);
+
+            // If selected custom ip prompt and then try to connect to server after ip has been entered
+            // else try connect to the selected server
+            if (selectedOption == -1) {
                 ClearConsole();
-                WriteLine($"INFO: Game's running.", false, 7, 0, defForegroundColor, ConsoleColor.DarkBlue);
-                LaunchGame("-join=" + ip + " -lan");
-                ClearConsole();
+                WriteLine("Enter ip: ", false, 0, 2);
+
+                string ip = Console.ReadLine();
+
+                try {
+                    if (ValidateIP(ip)) {
+                        ClearConsole();
+                        WriteLine($"INFO: Game's running.", false, 7, 0, defForegroundColor, ConsoleColor.DarkBlue);
+                        LaunchGame("-join=" + ip + " -lan");
+                        ClearConsole();
+                    } else {
+                        ClearConsole();
+                        WriteLine("ERROR: Invalid IP!", false, 7, 0, defForegroundColor, ConsoleColor.DarkRed);
+                    }
+                } catch {
+                    ClearConsole();
+                    WriteLine("ERROR: Couldn't start the game! Unknown ERROR.", false, 7, 0, defForegroundColor, ConsoleColor.DarkRed);
+                }
             } else {
-                ClearConsole();
-                WriteLine("ERROR: Invalid IP!", false, 7, 0, defForegroundColor, ConsoleColor.DarkRed);
+                try {
+                    ClearConsole();
+                    WriteLine($"INFO: Game's running.", false, 7, 0, defForegroundColor, ConsoleColor.DarkBlue);
+                    LaunchGame("-join=" + servers[selectedOption].ip + " -lan");
+                } catch {
+                    ClearConsole();
+                    WriteLine("ERROR: Couldn't start the game! Unknown ERROR.", false, 7, 0, defForegroundColor, ConsoleColor.DarkRed);
+                }
             }
         }
 
@@ -89,6 +122,7 @@ namespace FO2_Launcher {
             WriteLine($"Select an address to run the server on.", false, 0, 2);
             WriteLine($"INFO: Select an address to run the server on.", false, 7, 0, defForegroundColor, ConsoleColor.DarkBlue);
 
+            // Writout all the available networks to run the server on
             int selectedOption = 0;
             SelectingOptions(selectedOption, networks);
             ConsoleKeyInfo input;
@@ -104,6 +138,7 @@ namespace FO2_Launcher {
                 SelectingOptions(selectedOption, networks);
             } while (input.Key != ConsoleKey.Enter);
 
+            // Try to launch the game on the specified network
             try {
                 Network network = networks[selectedOption];
 
@@ -119,29 +154,6 @@ namespace FO2_Launcher {
             } catch {
                 ClearConsole();
                 WriteLine("ERROR: Couldn't start the game! Unknown ERROR.", false, 7, 0, defForegroundColor, ConsoleColor.DarkRed);
-            }
-        }
-
-        static void GetIPAddresses() {
-            // Get a list of all network interfaces (usually one per network card, dialup, and VPN connection) 
-            NetworkInterface[] networkInterfaces = NetworkInterface.GetAllNetworkInterfaces();
-
-            foreach (NetworkInterface network in networkInterfaces) {
-                // Read the IP configuration for each network 
-                IPInterfaceProperties properties = network.GetIPProperties();
-
-                // Each network interface may have multiple IP addresses 
-                foreach (IPAddressInformation address in properties.UnicastAddresses) {
-                    // We're only interested in IPv4 addresses for now 
-                    if (address.Address.AddressFamily != AddressFamily.InterNetwork)
-                        continue;
-
-                    // Ignore loopback addresses (e.g., 127.0.0.1) 
-                    if (IPAddress.IsLoopback(address.Address))
-                        continue;
-
-                    networks.Add(new Network(address.Address.ToString(), network.Name));
-                }
             }
         }
 
@@ -167,32 +179,5 @@ namespace FO2_Launcher {
 
             return exitCode;
         }
-
-        static bool ValidateIP(string ip) {
-            int count = 0;
-            string[] words = ip.Split('.');
-
-            foreach (string word in words) {
-                count++;
-
-                try {
-                    int temp = Convert.ToInt32(word);
-
-                    if (temp < 0 || temp > 255) {
-                        return false;
-                    }
-                } catch (Exception e) {
-                    return false;
-                }
-
-            }
-
-            if (count != 4) {
-                return false;
-            }
-
-            return true;
-        }
-
     }
 }
