@@ -1,136 +1,137 @@
-﻿using static System.Net.Mime.MediaTypeNames;
-using System.Diagnostics;
+﻿using System.Diagnostics;
+using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
-using System.Net;
-using System;
+using static FO2_Launcher.TUI;
 
-namespace FO2_Launcher
-{
-    internal class Program
-    {
-        static private List<string> ipList;
-        static ConsoleColor defBackgroundColor;
-        static ConsoleColor defForegroundColor;
+namespace FO2_Launcher {
+    struct Network {
+        public string ip;
+        public string name;
+
+        public Network(string ip, string name) : this() {
+            this.ip = ip;
+            this.name = name;
+        }
+    }
+
+    internal class Program {
+        static private List<Network> networks = new List<Network> { };
+        static int consoleLines = 0;
         static string gameName = "flatout2.exe";
+        static string settings;
 
         static string command;
 
-        static void Main(string[] args)
-        {
-            ipList = new List<string>();
-            defBackgroundColor = Console.BackgroundColor; 
-            defForegroundColor = Console.ForegroundColor;
-
+        static void Main(string[] args) {
+            // Get all IPs
             GetIPAddresses();
+            InitTUI();
+            ClearConsole();
+            
 
-            Console.WriteLine("");
-            Console.WriteLine("Commands: run client; run server; set gamename");
-
-            try
-            {
+            // Get the settings
+            try {
                 gameName = File.ReadAllText("settings.txt").Trim();
-            }
-            catch
-            {
-                Console.ForegroundColor = ConsoleColor.White;
-                Console.BackgroundColor = ConsoleColor.Red;
-                Console.WriteLine("Can't find settings.txt; creating...");
-                Console.ForegroundColor = defForegroundColor;
-                Console.BackgroundColor = defBackgroundColor;
-
+            } catch {
+                var (cursorX, cursorY) = WriteLine("ERROR: Couldn't find settings.txt, creating...", false, 7, 0, defForegroundColor, ConsoleColor.DarkRed);
                 File.WriteAllText("settings.txt", gameName);
+                WriteLine("INFO: Created settings.txt", false, cursorX + 3, 0, defForegroundColor, ConsoleColor.DarkBlue);
             }
 
-            while (true)
-            {
-                command = Console.ReadLine();
+            // Main loop
+            int selectedOption = 0;
+            SelectingOptions(selectedOption);
+            ConsoleKeyInfo input;
+            do {
+                input = Console.ReadKey();
 
-                if (command == "run client")
-                {
-                    RunClient();
-                }
-                else if (command == "run server")
-                {
-                    RunServer();
-                }
-                else if (command == "set gamename")
-                {
-                    Console.WriteLine("current game name is: " + gameName + "\nset game name:");
-                    SetGameName();
-                    Console.WriteLine("game name has been saved and set to: " + gameName);
-                }
+                if (input.Key == ConsoleKey.DownArrow) { selectedOption++; }
+                if (input.Key == ConsoleKey.UpArrow) { selectedOption--; }
+                selectedOption &= 0b11;
+                if (input.Key == ConsoleKey.Enter) { SelectOption(selectedOption); }
+                SelectingOptions(selectedOption);
+            } while (input.Key != ConsoleKey.Escape || input.Key != ConsoleKey.Backspace);
+        }
+
+        static void SelectOption(int option) {
+            if (option == 0) {
+                RunClient();
+            }
+            if (option == 1) {
+                RunServer();
             }
         }
-        
-        static void SetGameName()
-        {
+
+        static void SetGameName() {
             gameName = Console.ReadLine();
             File.WriteAllText("settings.txt", gameName);
         }
 
-        static void RunClient()
-        {
-            Console.WriteLine("Please enter server IP:");
+        static void RunClient() {
+            ClearConsole();
+            WriteLine("Enter server IP:", false, 0, 2);
             string ip = Console.ReadLine();
 
-            if (ValidateIP(ip))
-            {
+            if (ValidateIP(ip)) {
+                ClearConsole();
+                WriteLine($"INFO: Game's running.", false, 7, 0, defForegroundColor, ConsoleColor.DarkBlue);
                 LaunchGame("-join=" + ip + " -lan");
-            }
-            else
-            {
-                Console.ForegroundColor = ConsoleColor.White;
-                Console.BackgroundColor = ConsoleColor.Red;
-                Console.WriteLine("Invalid IP!");
-                Console.ForegroundColor = defForegroundColor;
-                Console.BackgroundColor = defBackgroundColor;
+                ClearConsole();
+            } else {
+                ClearConsole();
+                WriteLine("ERROR: Invalid IP!", false, 7, 0, defForegroundColor, ConsoleColor.DarkRed);
             }
         }
 
-        static void RunServer()
-        {
-            Console.WriteLine($"Select an address (from 0 to {numberOfIPs-1}):");
+        static void RunServer() {
+            ClearConsole();
+            WriteLine($"Select an address to run the server on.", false, 0, 2);
+            WriteLine($"INFO: Select an address to run the server on.", false, 7, 0, defForegroundColor, ConsoleColor.DarkBlue);
 
-            try
-            {
-                string ip = ipList[Int32.Parse(Console.ReadLine())];
+            int selectedOption = 0;
+            SelectingOptions(selectedOption, networks);
+            ConsoleKeyInfo input;
+            do {
+                input = Console.ReadKey();
 
-                if (ValidateIP(ip))
-                {
-                    LaunchGame("-host -lan -private_addr=" + ip);
+                if (input.Key == ConsoleKey.Escape || input.Key == ConsoleKey.Backspace) { ClearConsole(); return; }
+                if (input.Key == ConsoleKey.DownArrow) { selectedOption++; }
+                if (input.Key == ConsoleKey.UpArrow) { selectedOption--; }
+                if (selectedOption < 0) { selectedOption = networks.Count-1; }
+                if (selectedOption > networks.Count-1) { selectedOption = 0; }
+
+                SelectingOptions(selectedOption, networks);
+            } while (input.Key != ConsoleKey.Enter);
+
+            try {
+                Network network = networks[selectedOption];
+
+                if (ValidateIP(network.ip)) {
+                    ClearConsole();
+                    WriteLine($"INFO: Game server launched on IP: {network.ip}", false, 7, 0, defForegroundColor, ConsoleColor.DarkBlue);
+                    LaunchGame("-host -lan -private_addr=" + network.ip);
+                    ClearConsole();
+                } else {
+                    ClearConsole();
+                    WriteLine("ERROR: Invalid IP!", false, 7, 0, defForegroundColor, ConsoleColor.DarkRed);
                 }
-                else
-                {
-                    Console.WriteLine("Invalid IP!");
-                }
-            }
-            catch
-            {
-                Console.ForegroundColor = ConsoleColor.White;
-                Console.BackgroundColor = ConsoleColor.Red;
-                Console.WriteLine("WRONG INDEX OF AN IP ADDRESS");
-                Console.ForegroundColor = defForegroundColor;
-                Console.BackgroundColor = defBackgroundColor;
+            } catch {
+                ClearConsole();
+                WriteLine("ERROR: Couldn't start the game! Unknown ERROR.", false, 7, 0, defForegroundColor, ConsoleColor.DarkRed);
             }
         }
 
-        static int numberOfIPs = 0;
-        static void GetIPAddresses()
-        {
-            Console.WriteLine("ALL ADDRESSES");
-
+        static void GetIPAddresses() {
             // Get a list of all network interfaces (usually one per network card, dialup, and VPN connection) 
             NetworkInterface[] networkInterfaces = NetworkInterface.GetAllNetworkInterfaces();
 
-            foreach (NetworkInterface network in networkInterfaces)
-            {
+            foreach (NetworkInterface network in networkInterfaces) {
                 // Read the IP configuration for each network 
                 IPInterfaceProperties properties = network.GetIPProperties();
 
                 // Each network interface may have multiple IP addresses 
-                foreach (IPAddressInformation address in properties.UnicastAddresses)
-                {
+                foreach (IPAddressInformation address in properties.UnicastAddresses) {
                     // We're only interested in IPv4 addresses for now 
                     if (address.Address.AddressFamily != AddressFamily.InterNetwork)
                         continue;
@@ -139,15 +140,12 @@ namespace FO2_Launcher
                     if (IPAddress.IsLoopback(address.Address))
                         continue;
 
-                    Console.WriteLine(numberOfIPs + ". " + address.Address.ToString() + " (" + network.Name + ")");
-                    ipList.Add(address.Address.ToString());
-                    numberOfIPs++;
+                    networks.Add(new Network(address.Address.ToString(), network.Name));
                 }
             }
         }
 
-        static int LaunchGame(string args)
-        {
+        static int LaunchGame(string args) {
             int exitCode = -1;
 
             // Prepare the process to run
@@ -156,55 +154,40 @@ namespace FO2_Launcher
             start.UseShellExecute = true;
 
             // Run the external process & wait for it to finish
-            try
-            {
-                using (Process proc = Process.Start(start))
-                {
+            try {
+                using (Process proc = Process.Start(start)) {
                     proc.WaitForExit();
 
                     // Retrieve the app's exit code
                     exitCode = proc.ExitCode;
                 }
-            }
-            catch (Exception e)
-            {
-                Console.ForegroundColor = ConsoleColor.White;
-                Console.BackgroundColor = ConsoleColor.Red;
-                Console.WriteLine(e.Message);
-                Console.ForegroundColor = defForegroundColor;
-                Console.BackgroundColor = defBackgroundColor;
+            } catch (Exception e) {
+                WriteLine(e.Message, false, 7, 0, defForegroundColor, ConsoleColor.DarkRed);
             }
 
             return exitCode;
         }
 
-        static bool ValidateIP(string ip)
-        {
+        static bool ValidateIP(string ip) {
             int count = 0;
             string[] words = ip.Split('.');
 
-            foreach (string word in words)
-            {
+            foreach (string word in words) {
                 count++;
 
-                try
-                {
+                try {
                     int temp = Convert.ToInt32(word);
 
-                    if (temp < 0 || temp > 255)
-                    {
+                    if (temp < 0 || temp > 255) {
                         return false;
                     }
-                }
-                catch (Exception e)
-                {
+                } catch (Exception e) {
                     return false;
                 }
 
             }
 
-            if (count != 4)
-            {
+            if (count != 4) {
                 return false;
             }
 
