@@ -19,7 +19,7 @@ namespace FO2_Launcher {
         static int port = 23756;
         // This message was obtained by getting the first packet that is sent to the server by the client
         // then it was stripped down to this
-        static string discoveryMessage = "000000000000bb217741464f3134000000000000000007";
+        static string discoveryMessage = "6b0000000000bb217741464f3134000000000000000007";
         public static async Task<List<(string, string)>> DiscoverServersAsync(List<Network> networks) {
             List<(string IP, string NetworkName)> ipAddresses = new List<(string, string)>();
             // Go through each network and send a broadcast udp packet to flatout 2 port
