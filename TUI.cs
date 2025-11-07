@@ -20,6 +20,7 @@ namespace FO2_Launcher {
         public static void ClearConsole() {
             Console.Clear();
             WriteLine("FO2L", true, 0, 0, defBackgroundColor, defForegroundColor);
+            WriteLine("[Up arrow key]/[W] move up, [Down arrow key]/[S] move down, [Enter]/[E] select, [Escape]/[Backspace]/[R] return", true, 0, Console.BufferHeight-3, defBackgroundColor, defForegroundColor);
             WriteLine(" ", true, 0, Console.CursorTop);
         }
 

@@ -33,12 +33,12 @@ namespace FO2_Launcher {
             do {
                 input = Console.ReadKey();
 
-                if (input.Key == ConsoleKey.DownArrow) { selectedOption++; }
-                if (input.Key == ConsoleKey.UpArrow) { selectedOption--; }
+                if (input.Key == ConsoleKey.DownArrow || input.Key == ConsoleKey.S) { selectedOption++; }
+                if (input.Key == ConsoleKey.UpArrow || input.Key == ConsoleKey.W) { selectedOption--; }
                 selectedOption &= 0b11;
-                if (input.Key == ConsoleKey.Enter) { SelectOption(selectedOption); }
+                if (input.Key == ConsoleKey.Enter || input.Key == ConsoleKey.E) { SelectOption(selectedOption); }
                 SelectingOptions(selectedOption);
-            } while (input.Key != ConsoleKey.Escape || input.Key != ConsoleKey.Backspace);
+            } while (!(input.Key == ConsoleKey.Escape || input.Key == ConsoleKey.Backspace || input.Key == ConsoleKey.R));
         }
 
         static void SelectOption(int option) {
