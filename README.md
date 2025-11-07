@@ -23,12 +23,13 @@ You can just put the launcher into the same directory as your game is in, and th
 
 
 
-### How to use
+## How to use
 When u launch the launcher, you'll see four options, two are currently not done, so they're grayed out. The two options that u want, are "run client" & "run server".
 ### Connect to server
 If u want to connect to a server, you can just select "run client", it will search for the servers for u. After a few seconds, you will see IP addresses of server/s, you can just select to which one u want to join and done. If none show up, you can try to select the "Custom IP" option, you will need the servers IP for that tho. If even that won't work, then you're either not on the same network as the server is (you could try to tell the server guy to try to run the server on different network/ip), thus you can't connect to it, or you might have either very bad connection to each other, or, and I haven't tested this, you have somehow after all these years that this game is out for, different versions of the game.
 ### Create a server
 If u want to create a server, you can just select "run server", then choose the network/ip you want the server to run on and done.
+
 
 
 
